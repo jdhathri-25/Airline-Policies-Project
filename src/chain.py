@@ -4,21 +4,57 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-# ---------- Offline fallback (Ollama) ----------
+load_dotenv()
+
+# ---------- Load API key (Streamlit secrets first, then .env) ----------
+def _get_gemini_key():
+    try:
+        import streamlit as st
+        if "GEMINI_API_KEY" in st.secrets:
+            return st.secrets["GEMINI_API_KEY"]
+    except Exception:
+        pass
+    return os.getenv("GEMINI_API_KEY")
+
+
+# ---------- Ollama fallback: only enable locally ----------
+def _ollama_enabled():
+    # Explicit override via env var
+    env_flag = os.getenv("ENABLE_OLLAMA_FALLBACK", "").lower()
+    if env_flag == "true":
+        return True
+    if env_flag == "false":
+        return False
+    # Auto-detect: enabled only when NOT running on Streamlit Cloud
+    try:
+        import streamlit as st
+        if hasattr(st, "secrets") and st.secrets:
+            # On Streamlit Cloud, there is no local Ollama
+            return False
+    except Exception:
+        pass
+    return True  # local dev → allow fallback
+
+
+OLLAMA_ENABLED = _ollama_enabled()
+
 try:
-    from ollama import chat as ollama_chat
-    OLLAMA_AVAILABLE = True
+    if OLLAMA_ENABLED:
+        from ollama import chat as ollama_chat
+        OLLAMA_AVAILABLE = True
+    else:
+        OLLAMA_AVAILABLE = False
 except ImportError:
     OLLAMA_AVAILABLE = False
 
-load_dotenv()
 
-# ---------- Gemini client with 5-second timeout ----------
+# ---------- Gemini client ----------
 client = genai.Client(
-    api_key=os.getenv("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=5000),
+    api_key=_get_gemini_key(),
+    http_options=types.HttpOptions(timeout=15000),  # 15s; cloud can be slower
 )
 
+# ---------- Load policy ----------
 with open("data/policies/policy.txt", "r", encoding="utf-8") as f:
     POLICY_TEXT = f.read()
 
@@ -42,7 +78,6 @@ CONTEXT:
 
 
 def _try_gemini(user_query: str) -> str:
-    """Online answer via Gemini. Single attempt with short timeout."""
     response = client.models.generate_content(
         model=MODEL_NAME,
         contents=user_query,
@@ -54,9 +89,8 @@ def _try_gemini(user_query: str) -> str:
 
 
 def _try_ollama(user_query: str) -> str:
-    """Offline answer via local Ollama model."""
     if not OLLAMA_AVAILABLE:
-        raise RuntimeError("Ollama client not installed. Run: pip install ollama")
+        raise RuntimeError("Ollama not available on this environment")
     response = ollama_chat(
         model=OLLAMA_MODEL,
         messages=[
@@ -68,18 +102,19 @@ def _try_ollama(user_query: str) -> str:
 
 
 def get_answer(user_query: str, chat_history: list) -> str:
-    """Try Gemini with fast timeout; fall back to Ollama if it fails."""
+    """Try Gemini first; fall back to Ollama only when enabled (local dev)."""
     try:
         return _try_gemini(user_query)
     except Exception as e:
-        print(f"[chain] Gemini failed ({type(e).__name__}). Falling back to Ollama...")
+        print(f"[chain] Gemini failed ({type(e).__name__}): {e}")
 
-    try:
-        return _try_ollama(user_query)
-    except Exception as e:
-        print(f"[chain] Ollama also failed: {type(e).__name__}: {e}")
+    if OLLAMA_ENABLED:
+        try:
+            return _try_ollama(user_query)
+        except Exception as e:
+            print(f"[chain] Ollama also failed: {type(e).__name__}: {e}")
 
     return (
-        "⚠️ I'm offline and the local model isn't available. "
-        "Please check your connection or try again."
+        "⚠️ The AI service is temporarily unavailable. "
+        "Please try again in a moment."
     )

@@ -428,16 +428,21 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------- Pills ----------
-st.markdown("""
-<div class="pill-row">
-    <span class="pill">🧳 Baggage</span>
-    <span class="pill">⏰ Check-in</span>
-    <span class="pill">🎫 Boarding</span>
-    <span class="pill">⚖️ Excess Baggage</span>
-    <span class="pill">🛫 Travel Guidelines</span>
-</div>
-""", unsafe_allow_html=True)
+# ---------- Clickable topic pills ----------
+st.markdown('<div class="pill-row">', unsafe_allow_html=True)
+pill_cols = st.columns(5)
+topics = [
+    ("🧳 Baggage", "Explain cabin baggage rules"),
+    ("⏰ Check-in", "What is the check-in time process?"),
+    ("🎫 Boarding", "Summarize boarding group rules"),
+    ("⚖️ Excess Baggage", "Explain excess baggage concept"),
+    ("🛫 Travel Guidelines", "Explain general travel guidelines"),
+]
+for col, (label, query) in zip(pill_cols, topics):
+    with col:
+        if st.button(label, key=f"pill_{label}", use_container_width=True):
+            st.session_state.pending_query = query
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------- Empty greeting ----------
 if not st.session_state.messages:

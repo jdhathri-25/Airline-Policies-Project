@@ -1,39 +1,61 @@
 # ✈️ Airline Passenger Policy & Baggage Rule Explainer
 
-A Streamlit chatbot that explains airline baggage, check-in, boarding, and travel policies.
-It **only explains** — it cannot book, cancel, refund, or quote prices.
+An AI-powered Streamlit chatbot that explains airline baggage, check-in, boarding, and travel policies using Google Gemini Flash.
+
+The chatbot explains airline policies only. It cannot book flights, cancel bookings, process refunds, or quote prices.
 
 ## Tech Stack
-- Google Gemini Flash (`gemini-3.8-flash`) via the official `google-genai` SDK
-- Streamlit for the chat UI
+
+- Google Gemini via the official `google-genai` SDK
+- Streamlit for the chat interface
+- Python for application logic
 - Custom retry logic for transient API errors
 
 ## Architecture
-User → Streamlit UI → `get_answer()` → Gemini Flash (with system prompt + policy context) → Response
 
-The entire policy document is injected into the system prompt, giving the model grounding
-without needing a separate vector store during runtime.
+User → Streamlit UI → `get_answer()` → Gemini Flash → Response
+
+The policy document is included in the system prompt to provide context for answering user queries without requiring a separate vector store at runtime.
 
 ## Setup
-1. `pip install -r requirements.txt`
-2. Add `GEMINI_API_KEY=...` to `.env`
-3. `streamlit run app.py`
 
-## Files
+1. Install the dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Create a `.env` file in the project root and add your API key:
+
+   ```text
+   GEMINI_API_KEY=your_api_key_here
+   ```
+
+3. Run the application:
+
+   ```bash
+   streamlit run app.py
+   ```
+
+## Project Structure
+
 - `app.py` — Streamlit frontend
-- `src/config.py` — configuration
-- `src/document_loader.py` — policy file loader (used in earlier RAG iteration)
-- `src/vector_store.py` — FAISS index (earlier RAG iteration)
-- `src/chain.py` — the LLM wrapper + system prompt (guardrails)
-- `data/policies/policy.txt` — source policy document
-- `tests/test_queries.md` — test log
+- `src/config.py` — Configuration
+- `src/document_loader.py` — Policy document loader
+- `src/vector_store.py` — FAISS vector store from an earlier RAG iteration
+- `src/chain.py` — LLM wrapper and system prompt
+- `data/` — Policy data
+- `tests/` — Test files
 
 ## Guardrails
-The system prompt strictly limits the bot to policy explanation.
-Booking, cancellation, refunds, and pricing queries are politely refused.
+
+- Explains airline policies only.
+- Refuses booking, cancellation, refund, and pricing requests.
+- Advises users to verify policies with the relevant airline.
 
 ## Limitations
-- Single source document (general airline policies).
-- Policies are subject to change — verify with the airline.
-- Not a booking or transaction system.
-- Free-tier Gemini API may occasionally return 503/429; retries handle most cases.
+
+- Uses a limited set of policy documents.
+- Airline policies may change over time.
+- Does not perform bookings or transactions.
+- Gemini API availability and rate limits may affect responses.

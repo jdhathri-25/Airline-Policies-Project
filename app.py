@@ -1,14 +1,16 @@
 import streamlit as st
-from src.chain import get_answer
-import time
 
-# ---------- Page config ----------
+# ---------- Page config MUST be the first Streamlit command ----------
 st.set_page_config(
     page_title="SkyAssist — Airline Policy Explainer",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Now safe to import the chain (which touches st.secrets internally)
+from src.chain import get_answer
+import time
 
 # ---------- Custom CSS ----------
 st.markdown("""
@@ -467,8 +469,6 @@ chat_input = st.chat_input("Ask about baggage, check-in, or boarding...")
 if chat_input:
     prompt = chat_input
 
-REFUSAL_KEYWORDS = ["book", "cancel", "refund", "fare", "price", "cheapest", "reschedule"]
-
 if prompt:
     st.session_state.query_count += 1
 
@@ -485,8 +485,10 @@ if prompt:
                 response = f"⚠️ Something went wrong: `{type(e).__name__}`. Please try again."
         elapsed = time.time() - start
 
-        if any(k in prompt.lower() for k in REFUSAL_KEYWORDS):
+        # Detect model-flagged refusal (structured tag, not keyword matching)
+        if response.startswith("[REFUSED]"):
             st.session_state.refusal_count += 1
+            response = response.replace("[REFUSED]", "", 1).strip()
 
         st.markdown(response)
         st.markdown(f'<span class="rt-chip">⚡ {elapsed:.2f}s</span>', unsafe_allow_html=True)
